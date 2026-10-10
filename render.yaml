@@ -1,0 +1,43 @@
+databases:
+  - name: stock-analysis-db
+    databaseName: stock_analysis
+    user: stock_analysis
+    plan: free
+
+services:
+  - type: web
+    name: stock-analysis-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stock-analysis-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: ALPHA_VANTAGE_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.10.9"
+
+  - type: web
+    name: stock-analysis-frontend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: streamlit run frontend/streamlit_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    envVars:
+      - key: FASTAPI_URL
+        fromService:
+          name: stock-analysis-api
+          type: web
+          property: host
+      - key: PYTHON_VERSION
+        value: "3.10.9"

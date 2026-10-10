@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stock-analysis-api
+    container_name: stock_fastapi
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=sqlite:////app/data/stock_analysis.db
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production-32chars}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - app_data:/app/data
+      - saved_models:/app/saved_models
+      - reports:/app/reports
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Streamlit frontend ───────────────────────────────────────────────────────
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: stock-analysis-frontend
+    container_name: stock_streamlit
+    restart: unless-stopped
+    environment:
+      - FASTAPI_URL=http://fastapi:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    command: >
+      streamlit run frontend/streamlit_app.py
+      --server.port 8501
+      --server.address 0.0.0.0
+      --server.headless true
+      --browser.gatherUsageStats false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  app_data:
+  saved_models:
+  reports:

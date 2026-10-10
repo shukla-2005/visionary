@@ -1,0 +1,20 @@
+# Python cache and local runtime files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Local database/runtime artifacts
+stock_analysis.db
+*.sqlite3
+
+# Editor metadata
+.vscode/

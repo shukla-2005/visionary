@@ -1,0 +1,42 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Local DB (will be in Docker volume)
+stock_analysis.db
+
+# Secrets
+.env
+
+# Docs / markdown (not needed in image)
+*.md
+!README.md
+
+# Test files
+tests/
+test_*.py
+
+# Local reports (will be in Docker volume)
+reports/*.csv
+reports/*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
