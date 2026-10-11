@@ -1,247 +1,191 @@
-# Stock Market Analysis and Prediction System
+# Stock Market Analysis & Prediction
 
-A comprehensive full-stack web application for analyzing and predicting stock prices of various listed companies using machine learning.
+A full-stack application for exploring historical stock data, comparing companies, and generating machine-learning forecasts. The project combines a Streamlit dashboard with a FastAPI backend and a relational database for user accounts and prediction history.
 
-## Features
+## Overview
 
-- **Stock Analysis**: Historical data, technical indicators, volatility analysis
-- **Comparative Analysis**: Compare multiple stocks side by side
-- **🆕 Advanced Machine Learning Predictions**:
-  - Individual model predictions (Linear Regression, Random Forest, XGBoost, LSTM)
-  - **Ensemble predictions** combining multiple models
-  - **Multi-day forecasting** with sequential predictions
-  - **Confidence intervals** with volatility-based uncertainty estimates
-  - **Batch predictions** for multiple stocks at once
-  - **Future price forecasts** with visualization and date ranges
-- **User Authentication**: JWT-based login/signup
-- **Interactive Dashboard**: Streamlit frontend with Plotly visualizations
-- **Report Generation**: Download analysis reports in CSV/PDF
-- **Stock Screener**: Filter stocks by various criteria
-- **Sector Analysis**: Analyze stocks by sector
-- **Prediction History**: Track and review all historical predictions
+Users can look up stocks, review price history and technical indicators, compare companies, and request single-stock or multi-day predictions. The application also supports saved prediction history and downloadable stock reports.
 
-## Tech Stack
+This project is for analysis and education. Forecasts are model estimates, not financial advice or guarantees of future performance.
 
-- **Backend**: FastAPI, Python
-- **Frontend**: Streamlit
-- **Database**: SQLite (default), PostgreSQL (production)
-- **ML**: scikit-learn, XGBoost, TensorFlow/Keras
-- **Data**: yfinance, pandas, numpy
-- **Visualization**: Plotly, matplotlib
-- **Deployment**: Docker
+## Data
 
-## Project Structure
+The application retrieves market information on demand:
 
-```
-visionary/
-├── app/
-│   ├── main.py
-│   ├── api/
-│   │   ├── auth.py
-│   │   ├── stocks.py
-│   │   ├── models.py (Enhanced with prediction endpoints)
-│   │   ├── history.py
-│   │   └── reports.py
-│   ├── core/
-│   ├── db/
-│   ├── models/
-│   ├── schemas/
-│   ├── services/
-│   │   └── prediction_service.py (Enhanced with ensemble/forecast methods)
-│   └── utils/
-├── frontend/
-│   ├── streamlit_app.py (Enhanced prediction UI with tabs)
-│   └── pages/
-├── ml/
-│   ├── predict.py (Enhanced with sequential forecasting)
-│   ├── train.py
-│   ├── lstm_model.py
-│   └── ...
-├── reports/
-├── saved_models/
-├── tests/
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
+- **Historical prices for analysis and model training:** Yahoo Finance through `yfinance`.
+- **Ticker search and US listing information:** Alpha Vantage endpoints; these features require an Alpha Vantage API key.
+- **Price and volume fields:** date, open, high, low, close, and volume.
+- **Derived features:** returns, rolling volatility and statistics, price ranges, lagged values, volume trends, and calendar features.
 
-## Local Setup
+Data availability depends on the upstream providers and their rate limits. No private or static market dataset is required to get started.
 
-1. **Clone the repository**
+## Project Workflow
+
+1. **Retrieve market data** for a requested ticker and time period.
+2. **Prepare and engineer features** from prices, volume, and dates; scale the model inputs.
+3. **Train or load forecasting models** such as Linear Regression, Random Forest, XGBoost, and (where TensorFlow is installed) LSTM.
+4. **Generate predictions** for one or more tickers, including ensemble estimates, multi-day forecasts, and confidence ranges.
+5. **Explore the results** in the Streamlit dashboard or through the FastAPI endpoints.
+6. **Save prediction history** for authenticated users and download CSV or PDF stock reports.
+
+## Dashboard
+
+The Streamlit app includes:
+
+- Home dashboard with market movers
+- Single-stock analysis and historical charts
+- Multi-company comparison
+- Model training, individual predictions, ensemble estimates, and forecasts
+- Prediction history
+- CSV/PDF report downloads
+- Sector analysis and a stock screener
+- Account registration and login
+
+## Results
+
+The application returns stock prices, technical-analysis data, model predictions, forecast timelines, and generated reports. Prediction quality depends on the ticker, available history, selected model, and market conditions. Model metrics are produced during training; no fixed accuracy or investment-return claim is made here.
+
+## Technology
+
+- **UI:** Streamlit
+- **API:** FastAPI, Uvicorn
+- **Data and analysis:** Python, pandas, NumPy, yfinance
+- **Machine learning:** scikit-learn, XGBoost, TensorFlow/Keras (optional for LSTM)
+- **Charts:** Plotly
+- **Persistence:** SQLAlchemy with SQLite locally or PostgreSQL in deployment
+- **Deployment:** Docker Compose or Render Blueprint
+
+## How to Run
+
+### Prerequisites
+
+- Python 3.10 (recommended; the Render Blueprint uses Python 3.10)
+- Git
+- An Alpha Vantage API key if you need ticker search or US listing features
+
+### Run locally with Python
+
+1. Clone the repository and enter its directory:
+
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/shukla-2005/visionary.git
    cd visionary
    ```
 
-2. **Create virtual environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+2. Create and activate a virtual environment.
+
+   **Windows PowerShell:**
+
+   ```powershell
+   py -3.10 -m venv .venv
+   .\.venv\Scripts\Activate.ps1
    ```
 
-3. **Install dependencies**
+   **macOS/Linux:**
+
    ```bash
-   pip install -r requirements.txt
+   python3.10 -m venv .venv
+   source .venv/bin/activate
    ```
 
-4. **Set up environment variables**
+3. Install dependencies:
+
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+4. Create a local environment file and set your own values:
+
+   **Windows PowerShell:**
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+   **macOS/Linux:**
+
    ```bash
    cp .env.example .env
-   # Edit .env with your settings
    ```
 
-5. **Run database migrations**
+   Set a unique local `SECRET_KEY`. Add `ALPHA_VANTAGE_API_KEY` if using Alpha Vantage-backed lookup features. Do not commit `.env`.
+
+5. Start the API in the first terminal:
+
    ```bash
-   alembic upgrade head
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
 
-6. **Run the FastAPI backend**
+6. Start the dashboard in a second terminal:
+
+   **Windows PowerShell** (use the local API started above):
+
+   ```powershell
+   $env:FASTAPI_URL = "http://localhost:8000"
+   streamlit run frontend/streamlit_app.py --server.port 8501
+   ```
+
+   **macOS/Linux:**
+
    ```bash
-   uvicorn app.main:app --reload
+   export FASTAPI_URL="http://localhost:8000"
+   streamlit run frontend/streamlit_app.py --server.port 8501
    ```
 
-7. **Run the Streamlit frontend** (in another terminal)
-   ```bash
-   streamlit run frontend/streamlit_app.py
-   ```
+7. Open:
 
-## Docker Setup
+   - Dashboard: <http://localhost:8501>
+   - API health check: <http://localhost:8000/health>
+   - Interactive API documentation: <http://localhost:8000/docs>
 
-1. **Build and run with Docker Compose**
-   ```bash
-   docker-compose up --build
-   ```
+The database tables are created automatically when the API starts. For local use, SQLite is the default.
 
-2. **Access the application**
-   - Frontend: http://localhost:8501
-   - Backend API: http://localhost:8000
-   - API Docs: http://localhost:8000/docs
+### Run with Docker Compose
 
-## API Endpoints
+With Docker Desktop running, from the repository root run:
 
-- `POST /auth/register` - User registration
-- `POST /auth/login` - User login
-- `GET /stocks/search/{ticker}` - Search stock by ticker
-- `GET /stocks/history/{ticker}` - Get historical data
-- `GET /stocks/indicators/{ticker}` - Get technical indicators
-- `POST /stocks/compare` - Compare multiple stocks
-- `GET /stocks/sector-analysis` - Sector analysis
-- `GET /stocks/top-movers` - Top gainers/losers
-- `POST /models/train/{ticker}` - Train ML models
-- `GET /models/compare/{ticker}` - Compare model performance
-- `POST /predict/{ticker}` - Make predictions
-- `GET /history` - User prediction history
-- `GET /report/{ticker}` - Generate report
-
-## Advanced Prediction Features
-
-### 1. Ensemble Predictions
-Combine predictions from multiple ML models for more robust forecasts:
-- Averages predictions from Linear Regression, Random Forest, XGBoost, and LSTM
-- Provides standard deviation for uncertainty estimation
-- Confidence range based on model disagreement
-
-**API Endpoint**: `POST /models/ensemble/{ticker}`
-
-### 2. Future Price Forecasts
-Generate sequential, multi-day price forecasts with visualization:
-- Recursive predictions for 7-90 days
-- Confidence intervals that widen with time horizon
-- Interactive Plotly charts showing forecast trends
-- Date-stamped predictions for easy tracking
-
-**API Endpoint**: `POST /models/forecast/{ticker}?days={num_days}`
-
-### 3. Confidence Intervals
-Get uncertainty estimates for predictions:
-- Volatility-based confidence calculations
-- Historical data used to compute realistic ranges
-- Confidence levels that adapt to prediction horizon
-
-**API Endpoint**: `POST /models/confidence/{ticker}`
-
-### 4. Batch Predictions
-Predict prices for multiple stocks simultaneously:
-- Efficient batch processing
-- Useful for portfolio analysis
-- Automatic history tracking for each prediction
-
-**API Endpoint**: `POST /models/predict-batch`
-```json
-{
-  "tickers": ["AAPL", "MSFT", "GOOGL"],
-  "model_name": "lstm",
-  "days_ahead": 7
-}
+```bash
+docker compose up --build
 ```
 
-### 5. Multi-Day Sequential Forecasting
-Recursive predictions that use previous day's forecast as input:
-- More realistic multi-day trends
-- Better captures market momentum
-- Works with all model types
+Open the dashboard at <http://localhost:8501> and API docs at <http://localhost:8000/docs>. To stop the services, press `Ctrl+C` and run `docker compose down`.
 
-**Python Function**: `predict_future_sequence(ticker, model_name, num_days)`
+## API
 
-## Frontend Prediction Dashboard
+FastAPI provides interactive endpoint documentation at `/docs`. Main endpoint groups include:
 
-The Streamlit frontend provides 4 prediction modes:
+- `/auth` — registration and login
+- `/stocks` — stock lookup, price history, indicators, comparison, sector analysis, and market movers
+- `/models` — training, prediction, ensemble, confidence, forecast, and batch prediction
+- `/history` — authenticated prediction history
+- `/report` — authenticated CSV/PDF report generation
 
-### Single Stock Prediction
-- Train individual models
-- Make predictions for specific time horizons
-- View detailed metrics
-
-### Multiple Stock Predictions
-- Compare predictions across multiple stocks
-- Batch processing for efficiency
-- Side-by-side comparison tables
-
-### Ensemble Predictions
-- Leverage multiple models
-- See individual model contributions
-- Confidence ranges from model disagreement
-
-### Future Price Forecasts
-- Visual trendlines with confidence bands
-- Interactive Plotly charts
-- Detailed forecast tables with dates
-
-## Usage
-
-1. **Sign up/Login** to access the dashboard
-2. **Search for stocks** using ticker symbols (e.g., AAPL, TSLA)
-3. **Analyze historical data** and technical indicators
-4. **Compare multiple stocks** side by side
-5. **Train ML models** and make price predictions
-6. **Use advanced features**:
-   - Generate ensemble predictions for better accuracy
-   - Create future forecasts with visualization
-   - Batch predict multiple stocks
-   - Download reports in CSV or PDF format
+Prediction, history, and report operations require authentication. Use the interactive API docs to inspect request schemas and try endpoints.
 
 ## Deployment
 
-### Streamlit Cloud
-1. Push to GitHub
-2. Connect to Streamlit Cloud
-3. Set environment variables
-4. Deploy
+The deployed FastAPI backend is available at <https://stock-analysis-api-0dqg.onrender.com>.
 
-### Railway/Render
-1. Use the Dockerfile
-2. Set environment variables
-3. Deploy the container
+- Health check: <https://stock-analysis-api-0dqg.onrender.com/health>
+- Interactive API documentation: <https://stock-analysis-api-0dqg.onrender.com/docs>
 
-## Contributing
+The Streamlit frontend is configured to use this backend by default. To connect a
+different backend, set `FASTAPI_URL` to its base URL. The Render Blueprint
+(`render.yaml`) automatically wires the frontend service to the API service.
+See [deployment_instructions.md](deployment_instructions.md) for setup steps and
+production notes.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make changes
-4. Submit a pull request
+## Repository Layout
 
-## License
-
-MIT License
+```text
+app/                  FastAPI routes, services, database, schemas, and auth
+frontend/              Streamlit dashboard
+ml/                    Data loading, feature engineering, training, and prediction
+saved_models/          Included trained model artifacts
+tests/                 API tests and database utilities
+reports/               Sample/generated reports
+render.yaml            Render Blueprint
+docker-compose.yml     Local container setup
+requirements.txt       Full local dependencies, including TensorFlow
+requirements-render.txt Dependencies used by the Render services
+```

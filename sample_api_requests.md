@@ -7,6 +7,10 @@ This document provides sample API requests for testing the Stock Market Analysis
 http://localhost:8000
 ```
 
+For the deployed API, use <https://stock-analysis-api-0dqg.onrender.com>. The
+examples in this file target a locally running backend; replace the base URL
+when testing against Render.
+
 ## Authentication
 
 ### Register User

@@ -5,6 +5,11 @@
 http://localhost:8000
 ```
 
+For the deployed backend, use <https://stock-analysis-api-0dqg.onrender.com>.
+Interactive deployed documentation is available at
+<https://stock-analysis-api-0dqg.onrender.com/docs>. The request examples below
+use the local development URL.
+
 ## Authentication
 All endpoints (except `/auth/*`) require JWT token in header:
 ```

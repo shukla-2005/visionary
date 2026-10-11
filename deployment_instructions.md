@@ -118,14 +118,17 @@ frontend, and PostgreSQL database.
    (or leave it blank if you do not use Alpha Vantage).
 5. Wait for the API, database, and frontend deployments to finish.
 6. Open the frontend service URL. Check the API at
-   `https://<stock-analysis-api-url>/health` and its docs at
-   `https://<stock-analysis-api-url>/docs`.
+   <https://stock-analysis-api-0dqg.onrender.com/health> and its docs at
+   <https://stock-analysis-api-0dqg.onrender.com/docs>.
 
+The deployed API base URL is <https://stock-analysis-api-0dqg.onrender.com>.
 The frontend Blueprint service reads the API service hostname and adds HTTPS
-automatically. Render-generated `SECRET_KEY` and database connection settings
-are wired through the Blueprint. Free Render web services may sleep when idle;
-free PostgreSQL databases have limited retention, so choose an appropriate
-paid persistent database for production data.
+automatically through `FASTAPI_URL`. For a separate Streamlit deployment, set
+its `FASTAPI_URL` environment variable to the API base URL above. Render-generated
+`SECRET_KEY` and database connection settings are wired through the Blueprint.
+Free Render web services may sleep when idle; free PostgreSQL databases have
+limited retention, so choose an appropriate paid persistent database for
+production data.
 
 ### Streamlit Cloud Deployment
 
