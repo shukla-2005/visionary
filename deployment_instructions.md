@@ -132,21 +132,27 @@ production data.
 
 ### Streamlit Cloud Deployment
 
-#### 1. Prepare for Streamlit Cloud
-Since Streamlit Cloud works best with pure Streamlit apps, modify the deployment:
+The FastAPI backend stays hosted on Render; Streamlit Community Cloud hosts only
+the dashboard.
 
-1. Create a `streamlit_app.py` in the root directory that includes both frontend and backend logic
-2. Or deploy only the frontend to Streamlit Cloud and backend separately
+1. Push the completed frontend changes to the GitHub branch you want to deploy.
+2. Sign in at <https://share.streamlit.io> with GitHub and choose **Create app**.
+3. Select repository `shukla-2005/visionary`, branch `master`, and main file
+   `frontend/streamlit_app.py`.
+4. In **Advanced settings**, select Python **3.10** to match the project's pinned
+   dependencies.
+5. Before deploying, add the following to the app's **Secrets**:
 
-#### 2. Deploy Frontend Only
-1. Go to https://share.streamlit.io
-2. Connect your GitHub repository
-3. Set main file path: `frontend/streamlit_app.py`
-4. Add secrets for API endpoints
-5. Deploy
+   ```toml
+   FASTAPI_URL = "https://stock-analysis-api-0dqg.onrender.com"
+   ```
 
-#### 3. Deploy Backend Separately
-Deploy the FastAPI backend to Railway/Render as described above.
+6. Deploy the app and open the URL provided by Streamlit Community Cloud.
+7. Test login/registration and a market-data action. The Render API may need up
+   to 90 seconds to respond after sleeping.
+
+The frontend reads `FASTAPI_URL` from Streamlit secrets or an environment
+variable. Do not commit secrets or credentials to the repository.
 
 ### Heroku Deployment
 

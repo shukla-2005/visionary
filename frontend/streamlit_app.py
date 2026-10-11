@@ -5,12 +5,6 @@ import plotly.graph_objects as go
 import os
 from datetime import datetime
 
-# FASTAPI_URL can point to a local API or a hosted deployment.
-API_BASE_URL = os.getenv(
-    "FASTAPI_URL", "https://stock-analysis-api-0dqg.onrender.com"
-).rstrip("/")
-if not API_BASE_URL.startswith(("http://", "https://")):
-    API_BASE_URL = f"https://{API_BASE_URL}"
 # Render free instances can take over 50 seconds to wake after inactivity.
 REQUEST_TIMEOUT = 90
 
@@ -21,6 +15,19 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Prefer environment variables for Render/local runs and Streamlit secrets on
+# Community Cloud.
+try:
+    configured_api_url = os.getenv("FASTAPI_URL") or st.secrets.get("FASTAPI_URL")
+except FileNotFoundError:
+    configured_api_url = os.getenv("FASTAPI_URL")
+
+API_BASE_URL = (
+    configured_api_url or "https://stock-analysis-api-0dqg.onrender.com"
+).strip().rstrip("/")
+if not API_BASE_URL.startswith(("http://", "https://")):
+    API_BASE_URL = f"https://{API_BASE_URL}"
 
 # Custom CSS
 st.markdown("""

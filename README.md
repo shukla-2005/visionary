@@ -175,6 +175,16 @@ different backend, set `FASTAPI_URL` to its base URL. The Render Blueprint
 See [deployment_instructions.md](deployment_instructions.md) for setup steps and
 production notes.
 
+The frontend can also be deployed separately to Streamlit Community Cloud.
+Select `frontend/streamlit_app.py` as the app file and set this in the app's
+**Secrets**:
+
+```toml
+FASTAPI_URL = "https://stock-analysis-api-0dqg.onrender.com"
+```
+
+The app reads `FASTAPI_URL` from Streamlit secrets or the process environment.
+
 ## Repository Layout
 
 ```text
