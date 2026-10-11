@@ -3,7 +3,6 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 import os
-from datetime import datetime
 
 # Render free instances can take over 50 seconds to wake after inactivity.
 REQUEST_TIMEOUT = 90
@@ -37,12 +36,6 @@ st.markdown("""
         font-weight: bold;
         color: #4f8bf9;
         margin: 0.4rem 0 0.6rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 0.25rem solid #1f77b4;
     }
     .sidebar-header {
         font-size: 1.5rem;
@@ -181,15 +174,24 @@ def sidebar():
                     reg_username = st.text_input("Username", key="reg_username")
                     reg_email = st.text_input("Email", key="reg_email")
                     reg_password = st.text_input(
-                        "Password", type="password", key="reg_password"
+                        "Password",
+                        type="password",
+                        key="reg_password",
+                        help="Maximum length: 72 UTF-8 bytes.",
                     )
-                    registration_submitted = st.form_submit_button("Register")
+                    registration_submitted = st.form_submit_button(
+                        "Create account", type="primary", use_container_width=True
+                    )
 
                 if registration_submitted:
                     reg_username = reg_username.strip()
                     reg_email = reg_email.strip()
                     if not reg_username or not reg_email or not reg_password:
                         st.error("Enter a username, email address, and password.")
+                    elif len(reg_password.encode("utf-8")) > 72:
+                        st.error(
+                            "Password must be no longer than 72 UTF-8 bytes."
+                        )
                     else:
                         try:
                             response = register_user(
@@ -202,7 +204,7 @@ def sidebar():
                                 f"{API_BASE_URL}. ({error})"
                             )
                         else:
-                            if response.status_code == 200:
+                            if response.status_code in (200, 201):
                                 st.success(
                                     "Registration successful! Select the Login tab "
                                     "to sign in."
@@ -443,10 +445,9 @@ def show_welcome():
 def show_home_dashboard():
     page_header(
         "🏠 Market dashboard",
-        "A quick view of major-market movers. Prices are indicative and may be delayed.",
+        "A quick view of major-market movers.",
     )
     refresh = st.button("↻ Refresh market data", type="primary")
-    st.caption("Market overview is loaded on demand and cached by the data provider.")
 
     if refresh or "dashboard_movers" not in st.session_state:
         try:
@@ -454,7 +455,6 @@ def show_home_dashboard():
                 response = api_request("GET", "/stocks/top-movers")
                 response.raise_for_status()
                 st.session_state["dashboard_movers"] = response.json()
-                st.session_state["dashboard_movers_loaded_at"] = datetime.now()
         except (requests.RequestException, ValueError) as error:
             show_api_error("Loading market data", response=locals().get("response"), error=error)
             return
@@ -582,10 +582,6 @@ def show_home_dashboard():
             )
         else:
             st.info("No stocks match that filter.")
-
-    loaded_at = st.session_state.get("dashboard_movers_loaded_at")
-    if loaded_at:
-        st.caption(f"Loaded locally at {loaded_at:%Y-%m-%d %H:%M}. Provider data may be cached.")
 
 def show_single_stock_analysis():
     page_header(
@@ -870,56 +866,69 @@ def show_comparison():
 def show_prediction():
     page_header(
         "🔮 Stock predictions",
-        "Train models or request an estimate for one or more tickers. Results are uncertain and not financial advice.",
+        "Train a model or generate single-stock, batch, ensemble, and forecast results.",
     )
 
-    # Tabs for different prediction modes
-    tab1, tab2, tab3, tab4 = st.tabs(["Single Stock", "Multiple Stocks", "Ensemble", "Forecast"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Single stock", "Multiple stocks", "Ensemble", "Forecast"]
+    )
 
     with tab1:
-        st.subheader("Single Stock Prediction")
-        col1, col2 = st.columns([1, 1])
-
-        with col1:
-            ticker = st.text_input(
-                "Stock Ticker", key="single_prediction_ticker",
-                placeholder="AAPL",
-            ).strip().upper()
-
-        with col2:
-            model = st.selectbox("Model", ["linear", "rf", "xgb", "lstm"])
-
-        days_options = st.multiselect("Prediction Days", [7, 15, 30], default=[7], key="single_days")
-
-        if st.button("Train Model", key="train_single"):
-            if not ticker:
-                st.warning("Enter a ticker symbol before training a model.")
-                return
-            try:
-                with st.spinner(f"Training {model} for {ticker}..."):
-                    response = api_request(
-                    "POST", f"/models/train/{ticker}", authenticated=True,
-                    json={"ticker": ticker, "models": [model]},
-                    )
-                    response.raise_for_status()
-
-                result = response.json()
-                st.session_state["single_training_result"] = {
-                    "ticker": ticker, "model": model, "result": result
-                }
-                st.success(f"Model trained successfully! Best model: {result['best_model']}")
-            except (requests.RequestException, ValueError) as error:
-                show_api_error(
-                    "Model training", response=getattr(error, "response", None),
-                    error=error if getattr(error, "response", None) is None else None,
+        st.subheader("Single-stock prediction")
+        with st.form("single_prediction_form"):
+            ticker_col, model_col = st.columns([2, 1])
+            with ticker_col:
+                ticker = st.text_input(
+                    "Ticker symbol", key="single_prediction_ticker",
+                    placeholder="AAPL",
+                ).strip().upper()
+            with model_col:
+                model = st.selectbox(
+                    "Model", ["linear", "rf", "xgb", "lstm"],
+                    key="single_prediction_model",
+                )
+            days_options = st.multiselect(
+                "Prediction horizons", [7, 15, 30], default=[7],
+                key="single_days",
+            )
+            train_col, predict_col = st.columns(2)
+            with train_col:
+                train_submitted = st.form_submit_button(
+                    "Train model", use_container_width=True
+                )
+            with predict_col:
+                predict_submitted = st.form_submit_button(
+                    "Generate prediction", type="primary", use_container_width=True
                 )
 
-        if st.button("Make Prediction", key="make_single"):
+        if train_submitted:
+            if not ticker:
+                st.warning("Enter a ticker symbol before training a model.")
+            else:
+                st.session_state.pop("single_training_result", None)
+                try:
+                    with st.spinner(f"Training {model} for {ticker}..."):
+                        response = api_request(
+                            "POST", f"/models/train/{ticker}", authenticated=True,
+                            json={"ticker": ticker, "models": [model]},
+                        )
+                        response.raise_for_status()
+                    st.session_state["single_training_result"] = {
+                        "ticker": ticker, "model": model, "result": response.json()
+                    }
+                except (requests.RequestException, ValueError) as error:
+                    show_api_error(
+                        "Model training", response=getattr(error, "response", None),
+                        error=error if getattr(error, "response", None) is None else None,
+                    )
+
+        if predict_submitted:
             if not ticker:
                 st.warning("Enter a ticker symbol before making a prediction.")
             elif not days_options:
                 st.warning("Select at least one prediction horizon.")
             else:
+                st.session_state.pop("single_prediction_result", None)
                 predictions = {}
                 try:
                     with st.spinner(f"Generating predictions for {ticker}..."):
@@ -936,184 +945,273 @@ def show_prediction():
                             response.raise_for_status()
                             predictions[days] = response.json()["predicted_price"]
                     st.session_state["single_prediction_result"] = {
-                        "ticker": ticker, "model": model, "predictions": predictions
+                        "ticker": ticker, "model": model,
+                        "days": days_options, "predictions": predictions,
                     }
                 except (requests.RequestException, ValueError, KeyError) as error:
                     show_api_error(
                         "Stock prediction", response=getattr(error, "response", None),
                         error=error if getattr(error, "response", None) is None else None,
                     )
-                if predictions:
-                    st.subheader("Predictions")
-                    cols = st.columns(len(predictions))
-                    for column, (days, price) in zip(cols, predictions.items()):
-                        column.metric(f"{days} days", f"${price:,.2f}")
 
         training = st.session_state.get("single_training_result")
-        if training and training["ticker"] == ticker:
-            result = training["result"]
-            st.caption(f"Last trained model: {training['model']} for {ticker}")
-            metrics = result.get("metrics", {}).get(training["model"])
+        if training and training["ticker"] == ticker and training["model"] == model:
+            st.success(f"{model.upper()} model trained for {ticker}.")
+            metrics = training["result"].get("metrics", {}).get(model, {})
             if metrics:
-                cols = st.columns(4)
-                for col, (name, value) in zip(cols, metrics.items()):
-                    col.metric(name.replace("_", " ").upper(), f"{value:.4f}")
+                metric_cols = st.columns(min(len(metrics), 4))
+                for column, (name, value) in zip(metric_cols, metrics.items()):
+                    column.metric(name.replace("_", " ").title(), f"{float(value):.4f}")
+
         prediction_result = st.session_state.get("single_prediction_result")
-        if prediction_result and prediction_result["ticker"] == ticker:
-            st.caption(f"Last prediction set uses the {prediction_result['model']} model.")
+        if (
+            prediction_result
+            and prediction_result["ticker"] == ticker
+            and prediction_result["model"] == model
+            and prediction_result["days"] == days_options
+        ):
+            st.subheader("Predicted prices")
+            cols = st.columns(len(prediction_result["predictions"]))
+            for column, (days, price) in zip(
+                cols, prediction_result["predictions"].items()
+            ):
+                column.metric(f"{days}-day horizon", f"${price:,.2f}")
 
     with tab2:
-        st.subheader("Multiple Stock Predictions")
-        tickers_input = st.text_area(
-            "Enter tickers (comma-separated)",
-            "AAPL, MSFT, GOOGL",
-            key="batch_tickers_input",
-            help="Enter up to 20 ticker symbols.",
-        )
-        model_batch = st.selectbox("Model", ["linear", "rf", "xgb", "lstm"], key="batch_model")
-        days_batch = st.select_slider("Days Ahead", options=list(range(1, 61)), value=7, key="batch_days")
+        st.subheader("Multiple-stock prediction")
+        with st.form("batch_prediction_form"):
+            tickers_input = st.text_area(
+                "Ticker symbols", "AAPL, MSFT, GOOGL",
+                key="batch_tickers_input",
+                help="Separate symbols with commas; up to 20 tickers.",
+            )
+            model_batch = st.selectbox(
+                "Model", ["linear", "rf", "xgb", "lstm"], key="batch_model"
+            )
+            days_batch = st.select_slider(
+                "Prediction horizon (days)",
+                options=list(range(1, 61)), value=7, key="batch_days",
+            )
+            batch_submitted = st.form_submit_button(
+                "Generate batch predictions", type="primary"
+            )
 
-        if st.button("Predict Multiple Stocks", key="predict_batch"):
-            try:
-                tickers_list = list(dict.fromkeys(
-                    t.strip().upper() for t in tickers_input.split(",") if t.strip()
-                ))
-                if not tickers_list:
-                    st.warning("Enter at least one ticker symbol.")
-                    return
-                if len(tickers_list) > 20:
-                    st.warning("Submit no more than 20 tickers at once.")
-                    return
-                with st.spinner(f"Predicting {len(tickers_list)} stocks..."):
-                    response = api_request(
-                    "POST", "/models/predict-batch", authenticated=True,
-                    json={
-                        "tickers": tickers_list,
-                        "model_name": model_batch,
-                        "days_ahead": days_batch
-                    })
-                    response.raise_for_status()
-                    result = response.json()
-                st.session_state["batch_prediction_result"] = result
-                st.success(f"Predictions completed for {len(tickers_list)} stocks")
+        normalized_tickers = list(dict.fromkeys(
+            symbol.strip().upper()
+            for symbol in tickers_input.split(",")
+            if symbol.strip()
+        ))
+        if batch_submitted:
+            if not normalized_tickers:
+                st.warning("Enter at least one ticker symbol.")
+            elif len(normalized_tickers) > 20:
+                st.warning("Submit no more than 20 tickers at once.")
+            else:
+                st.session_state.pop("batch_prediction_result", None)
+                try:
+                    with st.spinner(f"Predicting {len(normalized_tickers)} stocks..."):
+                        response = api_request(
+                            "POST", "/models/predict-batch", authenticated=True,
+                            json={
+                                "tickers": normalized_tickers,
+                                "model_name": model_batch,
+                                "days_ahead": days_batch,
+                            },
+                        )
+                        response.raise_for_status()
+                        st.session_state["batch_prediction_result"] = {
+                            "tickers": normalized_tickers,
+                            "model": model_batch,
+                            "days": days_batch,
+                            "result": response.json(),
+                        }
+                except (requests.RequestException, ValueError, KeyError) as error:
+                    show_api_error(
+                        "Batch prediction",
+                        response=getattr(error, "response", None),
+                        error=error if getattr(error, "response", None) is None else None,
+                    )
 
-                pred_data = []
-                for result_ticker, pred in result["predictions"].items():
-                    pred_data.append({
-                        "Ticker": result_ticker,
-                        "Status": "Complete" if pred.get("success") else "Failed",
-                        "Predicted Price": pred.get("prediction"),
-                        "Days Ahead": pred.get("days_ahead", days_batch),
-                        "Details": pred.get("error", ""),
-                    })
-                if pred_data:
-                    df = pd.DataFrame(pred_data)
-                    st.dataframe(
-                        df.style.format({"Predicted Price": "${:,.2f}"}),
-                        hide_index=True, use_container_width=True,
-                    )
-                    st.download_button(
-                        "Download batch results (CSV)",
-                        df.to_csv(index=False).encode("utf-8"),
-                        file_name="batch_predictions.csv",
-                        mime="text/csv",
-                    )
-                else:
-                    st.info("No results were returned for those tickers.")
-            except (requests.RequestException, ValueError, KeyError) as error:
-                show_api_error(
-                    "Batch prediction", response=getattr(error, "response", None),
-                    error=error if getattr(error, "response", None) is None else None,
+        batch = st.session_state.get("batch_prediction_result")
+        if (
+            batch
+            and batch["tickers"] == normalized_tickers
+            and batch["model"] == model_batch
+            and batch["days"] == days_batch
+        ):
+            pred_data = [
+                {
+                    "Ticker": result_ticker,
+                    "Status": "Complete" if prediction.get("success") else "Failed",
+                    "Predicted price ($)": prediction.get("prediction"),
+                    "Days ahead": prediction.get("days_ahead", days_batch),
+                    "Details": prediction.get("error", ""),
+                }
+                for result_ticker, prediction
+                in batch["result"].get("predictions", {}).items()
+            ]
+            if pred_data:
+                frame = pd.DataFrame(pred_data)
+                st.dataframe(
+                    frame.style.format(
+                        {"Predicted price ($)": "${:,.2f}"}, na_rep="—"
+                    ),
+                    hide_index=True,
+                    use_container_width=True,
                 )
+                st.download_button(
+                    "Download batch results",
+                    frame.to_csv(index=False).encode("utf-8"),
+                    file_name="batch_predictions.csv",
+                    mime="text/csv",
+                )
+            else:
+                st.info("No results were returned for those tickers.")
 
     with tab3:
-        st.subheader("Ensemble Prediction (Multiple Models)")
-        ticker_ens = st.text_input(
-            "Stock Ticker", key="ensemble_ticker", placeholder="AAPL"
-        ).strip().upper()
-        days_ens = st.select_slider("Days Ahead", options=list(range(1, 61)), value=7, key="ensemble_days")
+        st.subheader("Ensemble prediction")
+        with st.form("ensemble_prediction_form"):
+            ticker_ens = st.text_input(
+                "Ticker symbol", key="ensemble_ticker", placeholder="AAPL"
+            ).strip().upper()
+            days_ens = st.select_slider(
+                "Prediction horizon (days)",
+                options=list(range(1, 61)), value=7, key="ensemble_days",
+            )
+            ensemble_submitted = st.form_submit_button(
+                "Generate ensemble prediction", type="primary"
+            )
 
-        if st.button("Make Ensemble Prediction", key="predict_ensemble"):
+        if ensemble_submitted:
             if not ticker_ens:
-                st.warning("Enter a ticker symbol before requesting an ensemble prediction.")
-                return
-            try:
-                with st.spinner(f"Calculating ensemble for {ticker_ens}..."):
-                    response = api_request(
-                        "POST", f"/models/ensemble/{ticker_ens}",
-                        authenticated=True,
-                        json={"ticker": ticker_ens, "model_name": "linear", "days_ahead": days_ens},
+                st.warning("Enter a ticker symbol before requesting a prediction.")
+            else:
+                st.session_state.pop("ensemble_result", None)
+                try:
+                    with st.spinner(f"Calculating ensemble for {ticker_ens}..."):
+                        response = api_request(
+                            "POST", f"/models/ensemble/{ticker_ens}",
+                            authenticated=True,
+                            json={
+                                "ticker": ticker_ens,
+                                "model_name": "linear",
+                                "days_ahead": days_ens,
+                            },
+                        )
+                        response.raise_for_status()
+                        st.session_state["ensemble_result"] = {
+                            "ticker": ticker_ens,
+                            "days": days_ens,
+                            "result": response.json(),
+                        }
+                except (requests.RequestException, ValueError, KeyError) as error:
+                    show_api_error(
+                        "Ensemble prediction",
+                        response=getattr(error, "response", None),
+                        error=error if getattr(error, "response", None) is None else None,
                     )
-                    response.raise_for_status()
-                    result = response.json()
-                st.session_state["ensemble_result"] = {
-                    "ticker": ticker_ens, "result": result
-                }
-                st.success(f"Ensemble prediction for {ticker_ens}")
 
+        ensemble = st.session_state.get("ensemble_result")
+        if (
+            ensemble
+            and ensemble["ticker"] == ticker_ens
+            and ensemble["days"] == days_ens
+        ):
+            result = ensemble["result"]
+            required = {
+                "ensemble_prediction", "std_deviation",
+                "lower_bound", "upper_bound",
+            }
+            if not required.issubset(result):
+                st.error("The backend returned an incomplete ensemble result.")
+            else:
+                st.caption(f"{ensemble['days']}-day estimate for {ticker_ens}")
                 col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Ensemble Price", f"${result['ensemble_prediction']:.2f}")
-                with col2:
-                    st.metric("Std Deviation", f"${result['std_deviation']:.2f}")
-                with col3:
-                    st.metric(
-                        "Confidence Range",
-                        f"${result['lower_bound']:.2f} - ${result['upper_bound']:.2f}",
-                    )
-
-                st.subheader("Individual Model Predictions")
-                model_preds = []
-                for model_name, model_data in result["model_predictions"].items():
-                    if "error" not in model_data:
-                        model_preds.append({
-                            "Model": model_name,
-                            "Predicted Price": model_data["price"],
-                        })
-                if model_preds:
-                    df = pd.DataFrame(model_preds)
-                    st.dataframe(
-                        df.style.format({"Predicted Price": "${:,.2f}"}),
-                        hide_index=True, use_container_width=True,
-                    )
-
-            except (requests.RequestException, ValueError, KeyError) as error:
-                show_api_error(
-                    "Ensemble prediction", response=getattr(error, "response", None),
-                    error=error if getattr(error, "response", None) is None else None,
+                col1.metric("Ensemble price", f"${result['ensemble_prediction']:.2f}")
+                col2.metric("Standard deviation", f"${result['std_deviation']:.2f}")
+                col3.metric(
+                    "Confidence range",
+                    f"${result['lower_bound']:.2f}–${result['upper_bound']:.2f}",
                 )
+                model_preds = [
+                    {"Model": name, "Predicted price ($)": values["price"]}
+                    for name, values in result.get("model_predictions", {}).items()
+                    if "error" not in values and "price" in values
+                ]
+                if model_preds:
+                    st.dataframe(
+                        pd.DataFrame(model_preds).style.format(
+                            {"Predicted price ($)": "${:,.2f}"}
+                        ),
+                        hide_index=True,
+                        use_container_width=True,
+                    )
 
     with tab4:
-        st.subheader("Future Price Forecast")
-        ticker_forecast = st.text_input(
-            "Stock Ticker", key="forecast_ticker", placeholder="AAPL"
-        ).strip().upper()
-        model_forecast = st.selectbox("Model", ["linear", "rf", "xgb", "lstm"], key="forecast_model")
-        days_forecast = st.slider("Forecast Days", 7, 90, 30, key="forecast_days")
+        st.subheader("Price forecast")
+        with st.form("forecast_form"):
+            ticker_forecast = st.text_input(
+                "Ticker symbol", key="forecast_ticker", placeholder="AAPL"
+            ).strip().upper()
+            model_forecast = st.selectbox(
+                "Model", ["linear", "rf", "xgb", "lstm"], key="forecast_model"
+            )
+            days_forecast = st.slider(
+                "Forecast horizon (days)", 7, 90, 30, key="forecast_days"
+            )
+            forecast_submitted = st.form_submit_button(
+                "Generate forecast", type="primary"
+            )
 
-        if st.button("Generate Forecast", key="generate_forecast"):
+        if forecast_submitted:
             if not ticker_forecast:
                 st.warning("Enter a ticker symbol before generating a forecast.")
-                return
-            try:
-                with st.spinner(f"Generating {days_forecast}-day forecast for {ticker_forecast}..."):
-                    response = api_request(
-                        "POST", f"/models/forecast/{ticker_forecast}",
-                        authenticated=True,
-                        params={"days": days_forecast},
-                        json={"ticker": ticker_forecast, "model_name": model_forecast, "days_ahead": days_forecast},
+            else:
+                st.session_state.pop("forecast_result", None)
+                try:
+                    with st.spinner(
+                        f"Generating {days_forecast}-day forecast for {ticker_forecast}..."
+                    ):
+                        response = api_request(
+                            "POST", f"/models/forecast/{ticker_forecast}",
+                            authenticated=True,
+                            params={"days": days_forecast},
+                            json={
+                                "ticker": ticker_forecast,
+                                "model_name": model_forecast,
+                                "days_ahead": days_forecast,
+                            },
+                        )
+                        response.raise_for_status()
+                        st.session_state["forecast_result"] = {
+                            "ticker": ticker_forecast,
+                            "model": model_forecast,
+                            "days": days_forecast,
+                            "result": response.json(),
+                        }
+                except (requests.RequestException, ValueError, KeyError) as error:
+                    show_api_error(
+                        "Forecast generation",
+                        response=getattr(error, "response", None),
+                        error=error if getattr(error, "response", None) is None else None,
                     )
-                    response.raise_for_status()
-                    result = response.json()
-                st.session_state["forecast_result"] = {
-                    "ticker": ticker_forecast, "result": result
-                }
-                st.success(f"Forecast generated for {ticker_forecast}")
 
-                forecast_df = pd.DataFrame(result["forecast"])
+        forecast = st.session_state.get("forecast_result")
+        if (
+            forecast
+            and forecast["ticker"] == ticker_forecast
+            and forecast["model"] == model_forecast
+            and forecast["days"] == days_forecast
+        ):
+            forecast_df = pd.DataFrame(forecast["result"].get("forecast", []))
+            if forecast_df.empty or not {"date", "predicted_price"}.issubset(
+                forecast_df.columns
+            ):
+                st.info("No forecast data was returned.")
+            else:
                 forecast_df["date"] = pd.to_datetime(forecast_df["date"])
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
+                figure = go.Figure()
+                figure.add_trace(go.Scatter(
                     x=forecast_df["date"],
                     y=forecast_df["predicted_price"],
                     mode="lines+markers",
@@ -1121,37 +1219,33 @@ def show_prediction():
                     line={"color": "#4F8BF9", "width": 2},
                 ))
                 if {"lower_bound", "upper_bound"}.issubset(forecast_df.columns):
-                    fig.add_trace(go.Scatter(
+                    figure.add_trace(go.Scatter(
                         x=forecast_df["date"], y=forecast_df["upper_bound"],
                         mode="lines", line={"width": 0}, showlegend=False,
                     ))
-                    fig.add_trace(go.Scatter(
+                    figure.add_trace(go.Scatter(
                         x=forecast_df["date"], y=forecast_df["lower_bound"],
                         mode="lines", fill="tonexty", name="Confidence interval",
                         line={"width": 0}, fillcolor="rgba(79,139,249,0.18)",
                     ))
-                fig.update_layout(
+                figure.update_layout(
                     title=f"{ticker_forecast} price forecast",
                     xaxis_title="Date", yaxis_title="Price (USD)",
                     hovermode="x unified", height=500,
                 )
-                st.plotly_chart(fig, use_container_width=True)
-                st.subheader("Forecast details")
+                st.plotly_chart(figure, use_container_width=True)
                 forecast_display = forecast_df.copy()
-                forecast_display["date"] = forecast_display["date"].dt.strftime("%Y-%m-%d")
+                forecast_display["date"] = forecast_display["date"].dt.strftime(
+                    "%Y-%m-%d"
+                )
                 st.dataframe(
                     forecast_display, hide_index=True, use_container_width=True
                 )
                 st.download_button(
-                    "Download forecast (CSV)",
+                    "Download forecast",
                     forecast_display.to_csv(index=False).encode("utf-8"),
                     file_name=f"{ticker_forecast}_forecast.csv",
                     mime="text/csv",
-                )
-            except (requests.RequestException, ValueError, KeyError) as error:
-                show_api_error(
-                    "Forecast generation", response=getattr(error, "response", None),
-                    error=error if getattr(error, "response", None) is None else None,
                 )
 
 def show_history():
@@ -1159,9 +1253,7 @@ def show_history():
         "📋 Prediction history",
         "Review saved forecasts, search by ticker, and download your history.",
     )
-    refresh_col, _ = st.columns([1, 4])
-    with refresh_col:
-        refresh = st.button("↻ Refresh history")
+    refresh = st.button("↻ Refresh history")
     if refresh or "prediction_history" not in st.session_state:
         try:
             with st.spinner("Loading prediction history..."):
@@ -1276,8 +1368,7 @@ def show_reports():
             )
     report = st.session_state.get("report_file")
     if report and report["ticker"] == ticker and report["format"] == format_type:
-        file_size = len(report["content"])
-        st.success(f"Your {ticker} {format_type.upper()} report is ready ({file_size:,} bytes).")
+        st.success(f"Your {ticker} {format_type.upper()} report is ready.")
         st.download_button(
             label=f"Download {ticker} report",
             data=report["content"],
@@ -1440,9 +1531,7 @@ def show_stock_screener():
                         )
 
     with listing_tab:
-        st.info(
-            "The full active listing comes from Alpha Vantage and may be large or rate limited."
-        )
+        st.caption("Loading the full active listing may take a moment.")
         load_col, refresh_col = st.columns([1, 1])
         with load_col:
             load_listing = st.button(
@@ -1450,8 +1539,7 @@ def show_stock_screener():
             )
         with refresh_col:
             refresh_listing = st.button("Refresh listing", key="refresh_stock_listing")
-        if (load_listing or refresh_listing
-                or "active_stock_listing" not in st.session_state):
+        if load_listing or refresh_listing:
             try:
                 with st.spinner("Fetching active exchange listing..."):
                     response = api_request(

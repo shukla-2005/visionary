@@ -41,6 +41,8 @@ The Streamlit app includes:
 - Sector analysis and a stock screener
 - Account registration and login
 
+Registration passwords can be up to 72 UTF-8 bytes.
+
 ## Results
 
 The application returns stock prices, technical-analysis data, model predictions, forecast timelines, and generated reports. Prediction quality depends on the ticker, available history, selected model, and market conditions. Model metrics are produced during training; no fixed accuracy or investment-return claim is made here.

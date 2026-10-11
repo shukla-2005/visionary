@@ -46,6 +46,23 @@ def test_register_user():
             assert response.status_code in [200, 400]
     _run_async(_test())
 
+def test_register_rejects_password_over_bcrypt_limit():
+    async def _test():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
+            import uuid
+            uid = uuid.uuid4().hex[:6]
+            response = await client.post(
+                "/auth/register",
+                json={
+                    "username": f"long_password_{uid}",
+                    "email": f"long_password_{uid}@example.com",
+                    "password": "p" * 73,
+                },
+            )
+            assert response.status_code == 422
+            assert "72 UTF-8 bytes" in response.json()["detail"][0]["msg"]
+    _run_async(_test())
+
 def test_login_user():
     async def _test():
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
@@ -67,6 +84,8 @@ if __name__ == "__main__":
     print("  [OK] test_search_stock passed")
     test_register_user()
     print("  [OK] test_register_user passed")
+    test_register_rejects_password_over_bcrypt_limit()
+    print("  [OK] test_register_rejects_password_over_bcrypt_limit passed")
     test_login_user()
     print("  [OK] test_login_user passed")
     print("All tests passed successfully!")
